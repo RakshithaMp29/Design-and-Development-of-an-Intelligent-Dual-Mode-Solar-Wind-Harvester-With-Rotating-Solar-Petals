@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Three Way Hybrid Energy Dashboard</title>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+
+  <!-- Chart JS -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Poppins", "Segoe UI", Arial, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(0, 255, 200, 0.18), transparent 30%),
+        radial-gradient(circle at top right, rgba(0, 140, 255, 0.18), transparent 30%),
+        linear-gradient(135deg, #061923, #07111f 55%, #031016);
+      color: #ffffff;
+    }
+
+    .main-wrapper {
+      width: 100%;
+      padding: 22px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.92), rgba(37, 99, 235, 0.92));
+      border-radius: 24px;
+      padding: 28px;
+      margin-bottom: 22px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      right: -80px;
+      top: -100px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+    }
+
+    .hero h1 {
+      font-size: 32px;
+      line-height: 1.25;
+      margin-bottom: 8px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .hero p {
+      color: #e0f2fe;
+      max-width: 900px;
+      font-size: 15px;
+      line-height: 1.6;
+      position: relative;
+      z-index: 2;
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 20px;
+      position: relative;
+      z-index: 2;
+    }
+
+    button {
+      border: none;
+      padding: 12px 18px;
+      border-radius: 999px;
+      font-weight: 800;
+      cursor: pointer;
+      color: white;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      transition: 0.25s;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.08);
+    }
+
+    .btn-blue {
+      background: linear-gradient(135deg, #38bdf8, #2563eb);
+    }
+
+    .btn-yellow {
+      background: linear-gradient(135deg, #facc15, #ca8a04);
+    }
+
+    .btn-red {
+      background: linear-gradient(135deg, #fb7185, #dc2626);
+    }
+
+    .top-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .summary-card {
+      background: rgba(12, 28, 45, 0.82);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      backdrop-filter: blur(14px);
+      border-radius: 22px;
+      padding: 20px;
+      box-shadow: 0 16px 35px rgba(0,0,0,0.28);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .summary-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.06), transparent);
+      pointer-events: none;
+    }
+
+    .summary-card h3 {
+      font-size: 14px;
+      color: #93c5fd;
+      margin-bottom: 12px;
+      font-weight: 700;
+    }
+
+    .summary-card .value {
+      font-size: 30px;
+      font-weight: 900;
+      margin-bottom: 6px;
+    }
+
+    .summary-card .sub {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    .source-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .source-card {
+      background: rgba(12, 28, 45, 0.86);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 24px;
+      padding: 22px;
+      box-shadow: 0 16px 35px rgba(0,0,0,0.28);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .source-card::after {
+      content: "";
+      position: absolute;
+      width: 140px;
+      height: 140px;
+      right: -50px;
+      top: -50px;
+      border-radius: 50%;
+      opacity: 0.22;
+    }
+
+    .solar::after { background: #facc15; }
+    .wind::after { background: #38bdf8; }
+    .hydro::after { background: #22c55e; }
+
+    .source-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      font-size: 25px;
+      background: rgba(255,255,255,0.1);
+    }
+
+    .source-title h2 {
+      font-size: 21px;
+    }
+
+    .source-title p {
+      color: #94a3b8;
+      font-size: 13px;
+      margin-top: 3px;
+    }
+
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(3, 12, 26, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      padding: 14px;
+      border-radius: 16px;
+      margin-bottom: 11px;
+    }
+
+    .metric label {
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+
+    .metric span {
+      font-size: 19px;
+      font-weight: 900;
+    }
+
+    .alert-panel {
+      background: rgba(12, 28, 45, 0.86);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 22px;
+      padding: 20px;
+      margin-bottom: 22px;
+      box-shadow: 0 16px 35px rgba(0,0,0,0.28);
+    }
+
+    .alert-panel h2 {
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+
+    .alert {
+      display: none;
+      padding: 14px 16px;
+      border-radius: 16px;
+      font-weight: 800;
+      margin-top: 10px;
+    }
+
+    .alert.show {
+      display: block;
+    }
+
+    .good {
+      background: rgba(34, 197, 94, 0.16);
+      color: #bbf7d0;
+      border: 1px solid #22c55e;
+    }
+
+    .bad {
+      background: rgba(239, 68, 68, 0.16);
+      color: #fecaca;
+      border: 1px solid #ef4444;
+    }
+
+    .warn {
+      background: rgba(245, 158, 11, 0.16);
+      color: #fde68a;
+      border: 1px solid #f59e0b;
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .chart-card {
+      background: rgba(12, 28, 45, 0.86);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 24px;
+      padding: 20px;
+      height: 390px;
+      box-shadow: 0 16px 35px rgba(0,0,0,0.28);
+    }
+
+    .chart-card h2 {
+      font-size: 19px;
+      margin-bottom: 12px;
+      color: #e0f2fe;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 300px !important;
+    }
+
+    .table-card {
+      background: rgba(12, 28, 45, 0.86);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 24px;
+      padding: 20px;
+      box-shadow: 0 16px 35px rgba(0,0,0,0.28);
+    }
+
+    .table-card h2 {
+      margin-bottom: 12px;
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      min-width: 1050px;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 16px;
+    }
+
+    th, td {
+      text-align: center;
+      padding: 13px 10px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+      font-size: 14px;
+    }
+
+    th {
+      color: #93c5fd;
+      background: rgba(3, 12, 26, 0.86);
+    }
+
+    td {
+      color: #e5e7eb;
+    }
+
+    .note {
+      margin-top: 14px;
+      color: #94a3b8;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    @media (max-width: 1100px) {
+      .top-grid,
+      .source-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .chart-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .main-wrapper {
+        padding: 14px;
+      }
+
+      .hero h1 {
+        font-size: 24px;
+      }
+
+      .top-grid,
+      .source-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .summary-card .value {
+        font-size: 25px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="main-wrapper">
+
+    <section class="hero">
+      <h1>Three-Way Hybrid Renewable Energy Dashboard</h1>
+      <!-- <p>
+        Live Firebase monitoring dashboard for Solar, Wind VAWT, and Hydro generation.
+        Data is read directly from Firebase Realtime Database and shown with historical graphs.
+      </p> -->
+
+      <div class="action-row">
+        <button onclick="downloadPDF()">Download PDF Report</button>
+        <button class="btn-blue" onclick="downloadCSV()">Download CSV Data</button>
+        <button class="btn-yellow" onclick="clearHistory()">Clear History</button>
+        <button class="btn-red" onclick="location.reload()">Refresh</button>
+      </div>
+    </section>
+
+    <section class="top-grid">
+      <div class="summary-card">
+        <h3>Firebase Status</h3>
+        <div class="value" id="firebaseStatus">Connecting</div>
+        <div class="sub">Realtime database live data</div>
+      </div>
+
+      <div class="summary-card">
+        <h3>Total Voltage</h3>
+        <div class="value" id="totalVoltage">0.00 V</div>
+        <div class="sub">Solar + Wind + Hydro</div>
+      </div>
+
+      <div class="summary-card">
+        <h3>Total Current</h3>
+        <div class="value" id="totalCurrent">0.00 A</div>
+        <div class="sub">Combined source current</div>
+      </div>
+
+      <div class="summary-card">
+        <h3>Total Power</h3>
+        <div class="value" id="totalPower">0.00 W</div>
+        <div class="sub">Calculated output power</div>
+      </div>
+    </section>
+
+    <section class="source-grid">
+      <div class="source-card solar">
+        <div class="source-title">
+          <div class="icon">☀️</div>
+          <div>
+            <h2>Solar Energy</h2>
+            <p>Solar panel source monitoring</p>
+          </div>
+        </div>
+
+        <div class="metric"><label>Voltage</label><span id="sVoltage">0.00 V</span></div>
+        <div class="metric"><label>Current</label><span id="sCurrent">0.00 A</span></div>
+        <div class="metric"><label>Power</label><span id="sPower">0.00 W</span></div>
+      </div>
+
+      <div class="source-card wind">
+        <div class="source-title">
+          <div class="icon">🌬️</div>
+          <div>
+            <h2>Wind VAWT</h2>
+            <p>Vertical Axis Wind Turbine</p>
+          </div>
+        </div>
+
+        <div class="metric"><label>Voltage</label><span id="wVoltage">0.00 V</span></div>
+        <div class="metric"><label>Current</label><span id="wCurrent">0.00 A</span></div>
+        <div class="metric"><label>Power</label><span id="wPower">0.00 W</span></div>
+      </div>
+
+      <div class="source-card hydro">
+        <div class="source-title">
+          <div class="icon">💧</div>
+          <div>
+            <h2>Hydro Power</h2>
+            <p>Water turbine source monitoring</p>
+          </div>
+        </div>
+
+        <div class="metric"><label>Voltage</label><span id="waVoltage">0.00 V</span></div>
+        <div class="metric"><label>Current</label><span id="waCurrent">0.00 A</span></div>
+        <div class="metric"><label>Power</label><span id="waPower">0.00 W</span></div>
+      </div>
+    </section>
+
+    <section class="alert-panel">
+      <h2>System Alerts</h2>
+      <div id="normalAlert" class="alert good">✅ System Normal: Firebase data is receiving successfully.</div>
+      <div id="lowAlert" class="alert bad">⚠️ Low Generation Alert: Total generated power is low.</div>
+      <div id="highAlert" class="alert warn">⚡ High Generation Alert: Total generated power is high.</div>
+      <div id="noDataAlert" class="alert bad">❌ No Firebase Data: Check database path, rules, or internet connection.</div>
+    </section>
+
+    <section class="chart-grid">
+      <div class="chart-card">
+        <h2>Solar Historical Graph</h2>
+        <canvas id="solarChart"></canvas>
+      </div>
+
+      <div class="chart-card">
+        <h2>Wind Historical Graph</h2>
+        <canvas id="windChart"></canvas>
+      </div>
+
+      <div class="chart-card">
+        <h2>Hydro Historical Graph</h2>
+        <canvas id="hydroChart"></canvas>
+      </div>
+
+      <div class="chart-card">
+        <h2>Total Historical Graph</h2>
+        <canvas id="totalChart"></canvas>
+      </div>
+    </section>
+
+    <section class="table-card">
+      <h2>Historical Data Stored in This Computer</h2>
+
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>S Voltage</th>
+              <th>S Current</th>
+              <th>S Power</th>
+              <th>W Voltage</th>
+              <th>W Current</th>
+              <th>W Power</th>
+              <th>Hydro Voltage</th>
+              <th>Hydro Current</th>
+              <th>Hydro Power</th>
+              <th>Total Power</th>
+            </tr>
+          </thead>
+          <tbody id="historyTable"></tbody>
+        </table>
+      </div>
+
+      <p class="note">
+        Firebase path: <b>Three_Way_Hybrid(5550)</b><br>
+        Firebase nodes: <b>S_Voltage, S_Current, W_Voltage, W_Current, Wa_Voltage, Wa_Current</b><br>
+        Battery section is removed as requested. Historical data is stored in browser localStorage.
+      </p>
+    </section>
+
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAr4IYnykpwovqOJWzfBd7abVdAma_Ig3Q",
+      authDomain: "diet-planner-3bdf3.firebaseapp.com",
+      databaseURL: "https://diet-planner-3bdf3-default-rtdb.firebaseio.com",
+      projectId: "diet-planner-3bdf3",
+      storageBucket: "diet-planner-3bdf3.firebasestorage.app",
+      messagingSenderId: "927878354911",
+      appId: "1:927878354911:web:2e616b171a267b9910566a",
+      measurementId: "G-MSYWCM58MT"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    const firebasePath = "Three_Way_Hybrid(5550)";
+    const maxHistory = 40;
+
+    let historyData = JSON.parse(localStorage.getItem("threeWayHybridOldDesignHistory")) || [];
+
+    function num(value) {
+      if (value === "" || value === null || value === undefined) return 0;
+      const n = parseFloat(value);
+      return isNaN(n) ? 0 : n;
+    }
+
+    function setText(id, text) {
+      document.getElementById(id).innerText = text;
+    }
+
+    function showAlert(type) {
+      ["normalAlert", "lowAlert", "highAlert", "noDataAlert"].forEach(id => {
+        document.getElementById(id).classList.remove("show");
+      });
+
+      if (type === "normal") document.getElementById("normalAlert").classList.add("show");
+      if (type === "low") document.getElementById("lowAlert").classList.add("show");
+      if (type === "high") document.getElementById("highAlert").classList.add("show");
+      if (type === "nodata") document.getElementById("noDataAlert").classList.add("show");
+    }
+
+    function createChart(id) {
+      return new Chart(document.getElementById(id).getContext("2d"), {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: "Voltage (V)",
+              data: [],
+              borderColor: "#38bdf8",
+              backgroundColor: "rgba(56,189,248,0.12)",
+              borderWidth: 3,
+              tension: 0.35
+            },
+            {
+              label: "Current (A)",
+              data: [],
+              borderColor: "#22c55e",
+              backgroundColor: "rgba(34,197,94,0.12)",
+              borderWidth: 3,
+              tension: 0.35
+            },
+            {
+              label: "Power (W)",
+              data: [],
+              borderColor: "#facc15",
+              backgroundColor: "rgba(250,204,21,0.12)",
+              borderWidth: 3,
+              tension: 0.35
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: "#ffffff", font: { weight: "bold" } }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: "#cbd5e1", maxRotation: 0 },
+              grid: { color: "rgba(255,255,255,0.08)" }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { color: "#cbd5e1" },
+              grid: { color: "rgba(255,255,255,0.08)" }
+            }
+          }
+        }
+      });
+    }
+
+    const solarChart = createChart("solarChart");
+    const windChart = createChart("windChart");
+    const hydroChart = createChart("hydroChart");
+    const totalChart = createChart("totalChart");
+
+    function updateOneChart(chart, vKey, cKey, pKey) {
+      chart.data.labels = historyData.map(x => x.time);
+      chart.data.datasets[0].data = historyData.map(x => x[vKey]);
+      chart.data.datasets[1].data = historyData.map(x => x[cKey]);
+      chart.data.datasets[2].data = historyData.map(x => x[pKey]);
+      chart.update();
+    }
+
+    function updateCharts() {
+      updateOneChart(solarChart, "sVoltage", "sCurrent", "sPower");
+      updateOneChart(windChart, "wVoltage", "wCurrent", "wPower");
+      updateOneChart(hydroChart, "waVoltage", "waCurrent", "waPower");
+      updateOneChart(totalChart, "totalVoltage", "totalCurrent", "totalPower");
+    }
+
+    function updateTable() {
+      const tbody = document.getElementById("historyTable");
+      tbody.innerHTML = "";
+
+      historyData.slice().reverse().forEach(row => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${row.time}</td>
+          <td>${row.sVoltage.toFixed(2)}</td>
+          <td>${row.sCurrent.toFixed(2)}</td>
+          <td>${row.sPower.toFixed(2)}</td>
+          <td>${row.wVoltage.toFixed(2)}</td>
+          <td>${row.wCurrent.toFixed(2)}</td>
+          <td>${row.wPower.toFixed(2)}</td>
+          <td>${row.waVoltage.toFixed(2)}</td>
+          <td>${row.waCurrent.toFixed(2)}</td>
+          <td>${row.waPower.toFixed(2)}</td>
+          <td>${row.totalPower.toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateDashboard(data) {
+      if (!data) {
+        setText("firebaseStatus", "No Data");
+        showAlert("nodata");
+        return;
+      }
+
+      const sVoltage = num(data.S_Voltage);
+      const sCurrent = num(data.S_Current);
+
+      const wVoltage = num(data.W_Voltage);
+      const wCurrent = num(data.W_Current);
+
+      const waVoltage = num(data.Wa_Voltage);
+      const waCurrent = num(data.Wa_Current);
+
+      const sPower = sVoltage * sCurrent;
+      const wPower = wVoltage * wCurrent;
+      const waPower = waVoltage * waCurrent;
+
+      const totalVoltage = sVoltage + wVoltage + waVoltage;
+      const totalCurrent = sCurrent + wCurrent + waCurrent;
+      const totalPower = sPower + wPower + waPower;
+
+      setText("firebaseStatus", "Connected");
+      setText("sVoltage", sVoltage.toFixed(2) + " V");
+      setText("sCurrent", sCurrent.toFixed(2) + " A");
+      setText("sPower", sPower.toFixed(2) + " W");
+
+      setText("wVoltage", wVoltage.toFixed(2) + " V");
+      setText("wCurrent", wCurrent.toFixed(2) + " A");
+      setText("wPower", wPower.toFixed(2) + " W");
+
+      setText("waVoltage", waVoltage.toFixed(2) + " V");
+      setText("waCurrent", waCurrent.toFixed(2) + " A");
+      setText("waPower", waPower.toFixed(2) + " W");
+
+      setText("totalVoltage", totalVoltage.toFixed(2) + " V");
+      setText("totalCurrent", totalCurrent.toFixed(2) + " A");
+      setText("totalPower", totalPower.toFixed(2) + " W");
+
+      const row = {
+        time: new Date().toLocaleTimeString(),
+        sVoltage, sCurrent, sPower,
+        wVoltage, wCurrent, wPower,
+        waVoltage, waCurrent, waPower,
+        totalVoltage, totalCurrent, totalPower
+      };
+
+      historyData.push(row);
+
+      if (historyData.length > maxHistory) {
+        historyData.shift();
+      }
+
+      localStorage.setItem("threeWayHybridOldDesignHistory", JSON.stringify(historyData));
+
+      if (totalPower <= 1) showAlert("low");
+      else if (totalPower >= 100) showAlert("high");
+      else showAlert("normal");
+
+      updateCharts();
+      updateTable();
+    }
+
+    database.ref(firebasePath).on("value", snapshot => {
+      updateDashboard(snapshot.val());
+    }, error => {
+      console.error(error);
+      setText("firebaseStatus", "Error");
+      showAlert("nodata");
+    });
+
+    function downloadCSV() {
+      if (historyData.length === 0) {
+        alert("No data available");
+        return;
+      }
+
+      let csv = "Time,S_Voltage,S_Current,S_Power,W_Voltage,W_Current,W_Power,Wa_Voltage,Wa_Current,Wa_Power,Total_Voltage,Total_Current,Total_Power\n";
+
+      historyData.forEach(row => {
+        csv += `${row.time},${row.sVoltage},${row.sCurrent},${row.sPower},${row.wVoltage},${row.wCurrent},${row.wPower},${row.waVoltage},${row.waCurrent},${row.waPower},${row.totalVoltage},${row.totalCurrent},${row.totalPower}\n`;
+      });
+
+      const blob = new Blob([csv], { type: "text/csv" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "three_way_hybrid_firebase_data.csv";
+      a.click();
+    }
+
+    function downloadPDF() {
+      if (historyData.length === 0) {
+        alert("No data available");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const latest = historyData[historyData.length - 1];
+
+      doc.setFontSize(16);
+      doc.text("Three-Way Hybrid Renewable Energy Report", 15, 18);
+
+      doc.setFontSize(11);
+      doc.text("Firebase Path: Three_Way_Hybrid(5550)", 15, 30);
+      doc.text("Generated: " + new Date().toLocaleString(), 15, 38);
+
+      let y = 52;
+      const lines = [
+        "Latest Firebase Reading",
+        `Solar Voltage: ${latest.sVoltage.toFixed(2)} V`,
+        `Solar Current: ${latest.sCurrent.toFixed(2)} A`,
+        `Solar Power: ${latest.sPower.toFixed(2)} W`,
+        `Wind Voltage: ${latest.wVoltage.toFixed(2)} V`,
+        `Wind Current: ${latest.wCurrent.toFixed(2)} A`,
+        `Wind Power: ${latest.wPower.toFixed(2)} W`,
+        `Hydro Voltage: ${latest.waVoltage.toFixed(2)} V`,
+        `Hydro Current: ${latest.waCurrent.toFixed(2)} A`,
+        `Hydro Power: ${latest.waPower.toFixed(2)} W`,
+        `Total Voltage: ${latest.totalVoltage.toFixed(2)} V`,
+        `Total Current: ${latest.totalCurrent.toFixed(2)} A`,
+        `Total Power: ${latest.totalPower.toFixed(2)} W`
+      ];
+
+      lines.forEach(line => {
+        doc.text(line, 15, y);
+        y += 8;
+      });
+
+      y += 6;
+      doc.text("Recent History", 15, y);
+      y += 8;
+
+      historyData.slice(-10).forEach(row => {
+        doc.text(`${row.time} | Solar ${row.sPower.toFixed(1)}W | Wind ${row.wPower.toFixed(1)}W | Hydro ${row.waPower.toFixed(1)}W | Total ${row.totalPower.toFixed(1)}W`, 15, y);
+        y += 7;
+      });
+
+      doc.save("three_way_hybrid_report.pdf");
+    }
+
+    function clearHistory() {
+      if (confirm("Clear historical data stored in this browser?")) {
+        historyData = [];
+        localStorage.removeItem("threeWayHybridOldDesignHistory");
+        updateCharts();
+        updateTable();
+      }
+    }
+
+    updateCharts();
+    updateTable();
+  </script>
+</body>
+</html>
